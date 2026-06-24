@@ -1,10 +1,69 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
+import Papa from "papaparse";
+import ProductCard from "./ProductCard";
+
+interface Product {
+  sku: string;
+  titulo: string;
+  imagen: string;
+  precioUnidad: string;
+  precioBulto: string;
+  destacado: string;
+  visible: string;
+}
+
+const CSV_URL =
+  "https://docs.google.com/spreadsheets/d/1pYlsiJs485QrIO5OZXzohwSekI3LUredIM9MfpNWjp4/export?format=csv&sheet=Catalogo%20Base";
+
 export default function Catalog() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    fetch(CSV_URL)
+      .then((res) => res.text())
+      .then((csv) => {
+        Papa.parse(csv, {
+          header: true,
+          complete: (results) => {
+            const items = results.data as any[];
+
+            const parsed: Product[] = items.map((item) => ({
+              sku: item["SKU"] || "",
+              titulo: item["TITULO"] || "",
+              imagen: item["imagen2"] || "",
+              precioUnidad: item["PRECIO X UNIDAD"] || "",
+              precioBulto: item["PRECIO X BULTO"] || "",
+              destacado: item["DESTACADO"] || "",
+              visible: item["VISIBLE"] || "",
+            }));
+
+            setProducts(parsed);
+          },
+        });
+      });
+  }, []);
+
+  const filteredProducts = useMemo(() => {
+    return products
+      .filter(
+        (p) =>
+          p.visible?.toUpperCase() === "SI" &&
+          (p.sku.toLowerCase().includes(search.toLowerCase()) ||
+            p.titulo.toLowerCase().includes(search.toLowerCase()))
+      )
+      .sort((a, b) => {
+        if (a.destacado === "SI" && b.destacado !== "SI") return -1;
+        if (a.destacado !== "SI" && b.destacado === "SI") return 1;
+        return 0;
+      });
+  }, [products, search]);
+
   return (
     <div className="min-h-screen bg-zinc-900 text-white p-6">
       <div className="max-w-7xl mx-auto">
-
         <h1 className="text-4xl font-bold mb-6">
           Catálogo OP VIP
         </h1>
@@ -12,37 +71,23 @@ export default function Catalog() {
         <input
           type="text"
           placeholder="Buscar por SKU o nombre..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
           className="w-full p-3 rounded-lg bg-zinc-800 border border-zinc-700 mb-6"
         />
 
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-
-          <div className="bg-zinc-800 rounded-xl p-4">
-            <div className="aspect-square bg-zinc-700 rounded-lg mb-3"></div>
-
-            <h2 className="font-semibold">
-              Producto de prueba
-            </h2>
-
-            <p className="text-zinc-400">
-              SKU: TEST001
-            </p>
-
-            <p className="mt-3">
-              Unidad: $10.000
-            </p>
-
-            <p>
-              Bulto: $9.500
-            </p>
-
-            <button className="w-full mt-4 bg-orange-500 py-2 rounded-lg">
-              Consultar
-            </button>
-          </div>
-
+          {filteredProducts.map((product) => (
+            <ProductCard
+              key={product.sku}
+              sku={product.sku}
+              titulo={product.titulo}
+              imagen={product.imagen}
+              precioUnidad={product.precioUnidad}
+              precioBulto={product.precioBulto}
+            />
+          ))}
         </div>
-
       </div>
     </div>
   );
